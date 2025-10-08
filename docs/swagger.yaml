@@ -1,0 +1,93 @@
+definitions:
+  controllers.WebsiteCreateRequest:
+    properties:
+      url:
+        example: https://example.com
+        type: string
+    type: object
+  schema.Website:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      isMonitored:
+        type: boolean
+      updatedAt:
+        type: string
+      url:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /health:
+    get:
+      description: Returns the health status of the server.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      tags:
+      - Health
+  /websites:
+    get:
+      description: Retrieves a list of all monitored websites.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/schema.Website'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List all websites
+      tags:
+      - Websites
+    post:
+      consumes:
+      - application/json
+      description: Adds a new website to the monitoring list and starts the crawling
+        process.
+      parameters:
+      - description: Website URL
+        in: body
+        name: website
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.WebsiteCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/schema.Website'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new website
+      tags:
+      - Websites
+swagger: "2.0"
