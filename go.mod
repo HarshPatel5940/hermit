@@ -3,7 +3,9 @@ module hermit
 go 1.25.1
 
 require (
+	github.com/a-h/templ v0.3.943
 	github.com/amikos-tech/chroma-go v0.2.5
+	github.com/coder/websocket v1.8.12
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jmoiron/sqlx v1.4.0
