@@ -31,12 +31,13 @@ This project is built with a focus on a robust, production-grade architecture fr
 
 ## Getting Started
 
+This project is managed entirely through a comprehensive `Makefile`. Run `make help` to see all available commands.
+
 ### Prerequisites
 
 *   Go (latest version)
-*   Docker and Docker Compose
+*   Docker or Podman
 *   `make`
-*   `air` for live reloading (`go install github.com/air-verse/air@latest`)
 
 ### Installation & Running
 
@@ -47,26 +48,27 @@ This project is built with a focus on a robust, production-grade architecture fr
     ```
 
 2.  **Set up environment variables:**
-    Copy the `.env.example` file to `.env` and fill in your database and service credentials. The default values are configured to work with the provided `docker-compose.yml` file.
+    Copy the `.env.example` file to `.env`. The default values are configured to work with the `docker-compose.yml` file and do not need to be changed for local development.
 
-3.  **Start backend services:**
-    This will start PostgreSQL, MinIO, and ChromaDB in Docker containers.
+3.  **First-Time Setup:**
+    This command starts all backend services (Postgres, MinIO, etc.) and runs the database migrations.
     ```sh
-    docker-compose up -d
+    make setup
     ```
 
-4.  **Run database migrations:**
-    This will create the necessary tables in your PostgreSQL database.
+4.  **Run the application in Development Mode:**
+    This is the main command for development. It starts all services and runs the application with live-reloading. It will automatically rebuild the app and regenerate API documentation when you save a Go file.
     ```sh
-    go run cmd/migrate/main.go up
+    make dev
     ```
 
-5.  **Run the application in development mode:**
-    This command uses `air` for live reloading. It will automatically rebuild the app and regenerate API documentation when you save a Go file.
-    ```sh
-    air
-    ```
-
-6.  **Access the API:**
+5.  **Access the API:**
     *   The API will be running at `http://localhost:8080`.
     *   API documentation is available at `http://localhost:8080/swagger/index.html`.
+
+### Other Useful Commands
+
+*   `make down`: Stop all running services.
+*   `make logs`: Tail the logs from all running services.
+*   `make test`: Run the test suite.
+*   `make docs`: Manually regenerate the API documentation.

@@ -1,77 +1,92 @@
-# Simple Makefile for a Go project
+# Auto-detect container engine (podman or docker)
+ifeq ($(shell command -v podman 2> /dev/null),)
+  CONTAINER_CMD ?= docker
+  # Check for docker compose v2 vs v1
+  ifneq ($(shell docker compose version 2> /dev/null; echo $$?), 0)
+    COMPOSE_CMD ?= docker-compose
+  else
+    COMPOSE_CMD ?= docker compose
+  endif
+else
+  CONTAINER_CMD ?= podman
+  COMPOSE_CMD ?= podman-compose
+endif
 
-# Build the application
-all: build test
-templ-install:
-	@if ! command -v templ > /dev/null; then \
-		read -p "Go's 'templ' is not installed on your machine. Do you want to install it? [Y/n] " choice; \
-		if [ "$$choice" != "n" ] && [ "$$choice" != "N" ]; then \
-			go install github.com/a-h/templ/cmd/templ@latest; \
-			if [ ! -x "$$(command -v templ)" ]; then \
-				echo "templ installation failed. Exiting..."; \
-				exit 1; \
-			fi; \
-		else \
-			echo "You chose not to install templ. Exiting..."; \
-			exit 1; \
-		fi; \
-	fi
-tailwind-install:
-	
-	@if [ ! -f tailwindcss ]; then curl -sL https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-macos-x64 -o tailwindcss; fi
-	@chmod +x tailwindcss
+# Default migration steps to 1 if not provided
+N ?= 1
 
-build: tailwind-install templ-install
-	@echo "Building..."
-	@templ generate
-	@go build -o main cmd/api/main.go
+.PHONY: help
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "High-Level Targets:"
+	@echo "  setup          - Run for the first time. Starts services and runs migrations."
+	@echo "  dev            - Start all services and run the app in live-reload mode."
+	@echo ""
+	@echo "Service Management:"
+	@echo "  up             - Start all services (Postgres, MinIO, etc.) in the background."
+	@echo "  down           - Stop all services."
+	@echo "  logs           - Tail the logs of all running services."
+	@echo ""
+	@echo "Application Lifecycle:"
+	@echo "  build          - Build the Go application binary."
+	@echo "  run            - Build and run the application."
+	@echo "  watch          - Run the application in live-reload mode using Air."
+	@echo "  clean          - Remove the binary and generated docs."
+	@echo ""
+	@echo "Database & Docs:"
+	@echo "  migrate-up     - Apply all outstanding database migrations."
+	@echo "  migrate-down   - Revert the last N migrations (default: 1). Usage: make migrate-down N=2"
+	@echo "  docs           - Generate API documentation using swag."
+	@echo ""
+	@echo "Testing:"
+	@echo "  test           - Run all Go tests."
 
-# Run the application
-run:
-	@go run cmd/api/main.go
-# Create DB container
-docker-run:
-	@if docker compose up --build 2>/dev/null; then \
-		: ; \
-	else \
-		echo "Falling back to Docker Compose V1"; \
-		docker-compose up --build; \
-	fi
+# High-Level Targets
+.PHONY: setup dev
+setup: up migrate-up
+	@echo "==> Setup complete. Run 'make dev' to start developing."
+dev: up watch
 
-# Shutdown DB container
-docker-down:
-	@if docker compose down 2>/dev/null; then \
-		: ; \
-	else \
-		echo "Falling back to Docker Compose V1"; \
-		docker-compose down; \
-	fi
+# Service Management
+.PHONY: up down logs
+up:
+	@echo "==> Starting services with $(COMPOSE_CMD)..."
+	@$(COMPOSE_CMD) up -d
+down:
+	@echo "==> Stopping services with $(COMPOSE_CMD)..."
+	@$(COMPOSE_CMD) down
+logs:
+	@$(COMPOSE_CMD) logs -f
 
-# Test the application
-test:
-	@echo "Testing..."
-	@go test ./... -v
-
-# Clean the binary
-clean:
-	@echo "Cleaning..."
-	@rm -f main
-
-# Live Reload
+# Application Lifecycle
+.PHONY: build run watch clean
+build: docs
+	@echo "==> Building application binary..."
+	@go build -o ./bin/hermit ./cmd/api
+run: build
+	@./bin/hermit
 watch:
-	@if command -v air > /dev/null; then \
-            air; \
-            echo "Watching...";\
-        else \
-            read -p "Go's 'air' is not installed on your machine. Do you want to install it? [Y/n] " choice; \
-            if [ "$$choice" != "n" ] && [ "$$choice" != "N" ]; then \
-                go install github.com/air-verse/air@latest; \
-                air; \
-                echo "Watching...";\
-            else \
-                echo "You chose not to install air. Exiting..."; \
-                exit 1; \
-            fi; \
-        fi
+	@echo "==> Starting live-reload server with Air..."
+	@air
+clean:
+	@echo "==> Cleaning up..."
+	@rm -rf ./bin ./docs
 
-.PHONY: all build run test clean watch tailwind-install templ-install
+# Database & Docs
+.PHONY: migrate-up migrate-down docs
+migrate-up:
+	@echo "==> Applying database migrations..."
+	@go run cmd/migrate/main.go up
+migrate-down:
+	@echo "==> Reverting last $(N) database migration(s)..."
+	@go run cmd/migrate/main.go down $(N)
+docs:
+	@echo "==> Generating API documentation..."
+	@swag init --generalInfo cmd/api/main.go
+
+# Testing
+.PHONY: test
+test:
+	@echo "==> Running tests..."
+	@go test -v ./...
