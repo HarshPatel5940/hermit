@@ -43,7 +43,7 @@ This project is managed entirely through a comprehensive `Makefile`. Run `make h
 
 1.  **Clone the repository:**
     ```sh
-    git clone https://github.com/harshnpatel/hermit.git
+    git clone https://github.com/harshpatel5940/hermit.git
     cd hermit
     ```
 
