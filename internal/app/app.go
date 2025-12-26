@@ -13,7 +13,10 @@ import (
 	"hermit/internal/config"
 	"hermit/internal/crawler"
 	"hermit/internal/database"
+	"hermit/internal/llm"
 	"hermit/internal/repositories"
+	"hermit/internal/storage"
+	"hermit/internal/vectorizer"
 
 	"github.com/coder/websocket"
 	"github.com/jmoiron/sqlx"
@@ -70,13 +73,31 @@ func NewFxApp() *fx.App {
 			config.NewConfig,
 			NewLogger,
 
-			crawler.NewCrawler,
-
 			database.NewPostgresDB,
 			database.NewMinIOClient,
 			database.NewChromaDBClient,
 
+			storage.NewMinIOStorage,
+
 			repositories.NewWebsiteRepository,
+			repositories.NewPageRepository,
+
+			func(cfg *config.Config, logger *zap.Logger) *vectorizer.Embedder {
+				return vectorizer.NewEmbedder(cfg.OllamaURL, cfg.OllamaModel, logger)
+			},
+			func(cfg *config.Config, logger *zap.Logger) (*vectorizer.ChromaRepository, error) {
+				return vectorizer.NewChromaRepository(cfg.ChromaDBURL, logger)
+			},
+			vectorizer.NewService,
+
+			func(cfg *config.Config, logger *zap.Logger) *llm.OllamaLLM {
+				return llm.NewOllamaLLM(cfg.OllamaURL, cfg.OllamaLLMModel, logger)
+			},
+			func(vectorizerSvc *vectorizer.Service, ollamaLLM *llm.OllamaLLM, logger *zap.Logger, cfg *config.Config) *llm.RAGService {
+				return llm.NewRAGService(vectorizerSvc, ollamaLLM, logger, cfg.RAGTopK, cfg.RAGContextChunks)
+			},
+
+			crawler.NewCrawler,
 
 			controllers.NewWebsiteController,
 

@@ -1,3 +1,5 @@
+bin/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -36,4 +38,3 @@ main
 # Tailwind CSS
 cmd/web/assets/css/output.css
 tailwindcss
-

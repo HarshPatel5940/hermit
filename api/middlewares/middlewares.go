@@ -8,9 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// SetupMiddlewares configures the global middlewares for the application.
 func SetupMiddlewares(e *echo.Echo, logger *zap.Logger) {
-	// Replace Echo's default logger with our structured zap logger
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogURI:    true,
 		LogStatus: true,
@@ -35,7 +33,7 @@ func SetupMiddlewares(e *echo.Echo, logger *zap.Logger) {
 	// For production, this should be locked down to specific origins.
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 	}))
 }

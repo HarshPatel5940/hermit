@@ -8,7 +8,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
-	"github.com/swaggo/echo-swagger"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 // AppForRoutes defines the interface required by the route setup functions.
@@ -28,6 +28,10 @@ func SetupRoutes(e *echo.Echo, app AppForRoutes, wc *controllers.WebsiteControll
 	websiteRoutes := api.Group("/websites")
 	websiteRoutes.POST("", wc.CreateWebsite)
 	websiteRoutes.GET("", wc.ListWebsites)
+	websiteRoutes.GET("/:id/pages", wc.GetPages)
+	websiteRoutes.POST("/:id/query", wc.QueryWebsite)
+	websiteRoutes.GET("/:id/status", wc.GetWebsiteStatus)
+	websiteRoutes.POST("/:id/recrawl", wc.RecrawlWebsite)
 
 	// Web Routes
 	e.Static("/assets", "web/assets")
