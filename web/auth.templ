@@ -28,7 +28,7 @@ templ Login() {
 			<div id="error-message" class="hidden mb-4 p-4 bg-red-900/50 border border-red-800 rounded-lg text-red-200 text-sm"></div>
 			<!-- Login Form -->
 			<form
-				hx-post="/api/v1/auth/login"
+				hx-post="/login"
 				hx-target="#error-message"
 				hx-swap="innerHTML"
 				class="space-y-6"
@@ -100,7 +100,7 @@ templ Register() {
 			<div id="error-message" class="hidden mb-4 p-4 bg-red-900/50 border border-red-800 rounded-lg text-red-200 text-sm"></div>
 			<!-- Register Form -->
 			<form
-				hx-post="/api/v1/auth/register"
+				hx-post="/register"
 				hx-target="#error-message"
 				hx-swap="innerHTML"
 				class="space-y-6"

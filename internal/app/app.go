@@ -139,8 +139,19 @@ func NewFxApp() *fx.App {
 			middlewares.SetupMiddlewares(e, logger, cfg)
 		}),
 		fx.Invoke(RegisterHooks),
-		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController, hc *controllers.HealthController, jc *controllers.JobsController, ac *controllers.AuthController, authService *auth.Service) {
-			routes.SetupRoutes(e, app, wc, hc, jc, ac, authService)
+		fx.Invoke(func(
+			e *echo.Echo,
+			app *App,
+			wc *controllers.WebsiteController,
+			hc *controllers.HealthController,
+			jc *controllers.JobsController,
+			ac *controllers.AuthController,
+			authService *auth.Service,
+			websiteRepo *repositories.WebsiteRepository,
+			apiKeyRepo *repositories.APIKeyRepository,
+			userRepo *repositories.UserRepository,
+		) {
+			routes.SetupRoutes(e, app, wc, hc, jc, ac, authService, websiteRepo, apiKeyRepo, userRepo)
 		}),
 		fx.Invoke(func(lc fx.Lifecycle, jobClient *jobs.Client) {
 			lc.Append(fx.Hook{

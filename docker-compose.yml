@@ -21,7 +21,6 @@ services:
       - "3903:3903" # Web endpoint
     environment:
       RUST_LOG: garage=info
-    command: server
     volumes:
       - garage_data:/data
       - garage_meta:/meta

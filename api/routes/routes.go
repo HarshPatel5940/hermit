@@ -6,9 +6,9 @@ import (
 	"hermit/api/controllers"
 	"hermit/api/middlewares"
 	"hermit/internal/auth"
+	"hermit/internal/repositories"
 	"hermit/web"
 
-	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
@@ -27,6 +27,9 @@ func SetupRoutes(
 	jc *controllers.JobsController,
 	ac *controllers.AuthController,
 	authService *auth.Service,
+	websiteRepo *repositories.WebsiteRepository,
+	apiKeyRepo *repositories.APIKeyRepository,
+	userRepo *repositories.UserRepository,
 ) {
 	// Root Route
 	e.GET("/", func(c echo.Context) error {
@@ -90,10 +93,8 @@ func SetupRoutes(
 	jobRoutes.POST("/queues/:queue/pause", jc.PauseQueue)
 	jobRoutes.POST("/queues/:queue/resume", jc.ResumeQueue)
 
-	// Web Routes (public)
-	e.Static("/assets", "web/assets")
-	e.GET("/web", echo.WrapHandler(templ.Handler(web.HelloForm())))
-	e.POST("/hello", echo.WrapHandler(http.HandlerFunc(web.HelloWebHandler)))
+	// Web Routes (handles frontend pages with session auth)
+	web.SetupRoutes(e, authService, websiteRepo, apiKeyRepo, userRepo)
 
 	// Websocket Route (public for now, can add auth later)
 	e.GET("/websocket", app.WebsocketHandler)

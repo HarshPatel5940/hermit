@@ -12,17 +12,21 @@ This project is built with a focus on a robust, production-grade architecture fr
 
 ### Key Features
 
-*   **Website Monitoring:** Add websites to a persistent monitoring list.
-*   **Intelligent Crawling:** A `colly`-based crawler navigates and scrapes all pages of a target domain with robots.txt respect and content quality filtering.
-*   **Modern Data Pipeline:** Scraped content is stored in **Garage** (S3-compatible), with vector embeddings managed by **ChromaDB** for similarity search.
-*   **Robust Backend:** A Go backend built with a clean, dependency-injected architecture using `uber-go/fx`.
-*   **Background Job Queue:** Asynchronous task processing using **asynq** and **Redis** for crawling and vectorization.
-*   **AI-Powered Chat:** RAG-based query system using Ollama for local LLM inference.
-*   **Content Processing:** Intelligent content extraction using readability algorithms to remove boilerplate and ads.
+*   **Modern Web UI:** Clean, dark-themed interface with session-based authentication
+*   **AI-Powered Chat:** RAG-based query system with SSE streaming responses using Ollama
+*   **Website Monitoring:** Add and manage websites with real-time crawl status tracking
+*   **Intelligent Crawling:** `colly`-based crawler with robots.txt respect and content quality filtering
+*   **API Key Management:** Secure API key creation, scoping, and revocation
+*   **Job Monitoring:** Admin dashboard for background job queue visibility
+*   **Modern Data Pipeline:** Garage (S3-compatible) storage with ChromaDB vector embeddings
+*   **Robust Backend:** Go backend with clean architecture, DI using `uber-go/fx`
+*   **Background Job Queue:** Asynchronous processing using **asynq** and **Redis**
+*   **Content Processing:** Intelligent extraction using readability algorithms
 
 ## Technology Stack
 
-*   **Backend:** Go
+### Backend
+*   **Language:** Go 1.21+
 *   **Framework:** Echo
 *   **Database:** PostgreSQL (managed with `sqlx`)
 *   **Object Storage:** Garage (S3-compatible)
@@ -33,29 +37,115 @@ This project is built with a focus on a robust, production-grade architecture fr
 *   **Live Reloading:** Air
 *   **Containerization:** Docker & Docker Compose
 
+### Frontend
+*   **Templates:** Templ (type-safe Go templates)
+*   **Styling:** Tailwind CSS v4
+*   **Interactivity:** HTMX + Alpine.js
+*   **Auth:** Cookie-based sessions
+*   **Streaming:** Server-Sent Events (SSE)
+
 ## Getting Started
 
 This project is managed entirely through a comprehensive `Makefile`. Run `make help` to see all available commands.
 
 ### Prerequisites
 
-*   Go (latest version)
+*   Go 1.21+
 *   Docker or Podman
 *   `make`
 *   Ollama (for local LLM inference)
+*   Node.js (optional, for Tailwind CSS standalone binary download)
 
-### Installation & Running
+### Quick Start
 
 1.  **Clone the repository:**
     ```sh
-    git clone https://github.com/harshpatel5940/hermit.git
+    git clone https://github.com/yourusername/hermit.git
     cd hermit
     ```
 
-2.  **Set up environment variables:**
+2.  **Install Ollama models:**
+    ```sh
+    ollama pull mxbai-embed-large
+    ollama pull llama3.1
+    ```
+
+3.  **First-time setup:**
+    ```sh
+    make setup
+    ```
+    This will:
+    - Install required Go tools (templ, swag)
+    - Start all services (PostgreSQL, Redis, Garage, ChromaDB, Ollama)
+    - Run database migrations
+
+4.  **Start development server:**
+    ```sh
+    make dev
+    ```
+    This starts the server with live-reload and all services.
+
+5.  **Access the application:**
+    - **Web UI:** http://localhost:8080
+    - **API Docs:** http://localhost:8080/api/v1/swagger/index.html
+    - **Health Check:** http://localhost:8080/api/v1/health
+
+### Using the Web Interface
+
+1.  **Register a new account:**
+    - Navigate to http://localhost:8080/register
+    - Create an account with email and password (min 8 characters)
+
+2.  **Login:**
+    - Navigate to http://localhost:8080/login
+    - Enter your credentials
+    - You'll be redirected to the chat interface
+
+3.  **Add a website:**
+    - Click "Websites" in the sidebar
+    - Click "Add Website" button
+    - Enter the URL, crawl depth, and max pages
+    - The website will be queued for crawling
+
+4.  **Chat with your data:**
+    - Navigate to "Chat" in the sidebar
+    - Ask questions about your indexed websites
+    - Responses stream in real-time using SSE
+
+5.  **Manage API keys:**
+    - Navigate to "API Keys" in the sidebar
+    - Create keys for programmatic access
+    - Copy the key immediately (shown only once)
+    - Use keys with `Authorization: Bearer hmt_xxxxx` header
+
+6.  **Monitor jobs (admin only):**
+    - Navigate to "Jobs" in the sidebar
+    - View pending, processing, and completed jobs
+    - Retry failed jobs or cancel pending ones
+
+### Building for Production
+
+1.  **Build all binaries:**
+    ```sh
+    make build
+    ```
+
+2.  **Run server:**
+    ```sh
+    ./bin/hermit
+    ```
+
+3.  **Run worker (separate terminal):**
+    ```sh
+    ./bin/worker
+    ```
+
+### Additional Commands
+
+*   **Set up environment variables:**
     Copy the `.env.example` file to `.env`. The default values are configured to work with the `docker-compose.yml` file and do not need to be changed for local development.
 
-3.  **First-Time Setup:**
+*   **First-Time Setup (alternative to Quick Start):**
     This command starts all backend services (Postgres, Garage, ChromaDB, Redis, Ollama) and runs the database migrations.
     ```sh
     make setup

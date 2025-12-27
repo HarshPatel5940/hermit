@@ -1,3 +1,4 @@
+-- +goose Up
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(26) PRIMARY KEY,
@@ -15,3 +16,9 @@ CREATE INDEX idx_users_email ON users(email);
 
 -- Create index on role for RBAC queries
 CREATE INDEX idx_users_role ON users(role);
+
+-- +goose Down
+-- Drop users table
+DROP INDEX IF EXISTS idx_users_role;
+DROP INDEX IF EXISTS idx_users_email;
+DROP TABLE IF EXISTS users;

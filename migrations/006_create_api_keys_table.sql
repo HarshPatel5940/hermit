@@ -1,3 +1,4 @@
+-- +goose Up
 -- Create api_keys table
 CREATE TABLE IF NOT EXISTS api_keys (
     id VARCHAR(26) PRIMARY KEY,
@@ -24,3 +25,11 @@ CREATE INDEX idx_api_keys_key_prefix ON api_keys(key_prefix);
 
 -- Create index on is_active for filtering active keys
 CREATE INDEX idx_api_keys_is_active ON api_keys(is_active);
+
+-- +goose Down
+-- Drop api_keys table
+DROP INDEX IF EXISTS idx_api_keys_is_active;
+DROP INDEX IF EXISTS idx_api_keys_key_prefix;
+DROP INDEX IF EXISTS idx_api_keys_key_hash;
+DROP INDEX IF EXISTS idx_api_keys_user_id;
+DROP TABLE IF EXISTS api_keys;
