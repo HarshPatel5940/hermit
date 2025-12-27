@@ -29,10 +29,13 @@ help:
 	@echo "  logs           - Tail the logs of all running services."
 	@echo ""
 	@echo "Application Lifecycle:"
-	@echo "  build          - Build the Go application binary."
-	@echo "  run            - Build and run the application."
-	@echo "  watch          - Run the application in live-reload mode using Air."
-	@echo "  clean          - Remove the binary and generated docs."
+	@echo "  build          - Build the server and worker binaries."
+	@echo "  build-server   - Build only the server binary."
+	@echo "  build-worker   - Build only the worker binary."
+	@echo "  run            - Build and run the server."
+	@echo "  run-worker     - Build and run the worker."
+	@echo "  watch          - Run the server in live-reload mode using Air."
+	@echo "  clean          - Remove binaries, generated docs, and frontend artifacts."
 	@echo ""
 	@echo "Database & Docs:"
 	@echo "  migrate-up     - Apply all outstanding database migrations."
@@ -40,6 +43,9 @@ help:
 	@echo "  docs           - Generate API documentation using swag."
 	@echo ""
 	@echo "Frontend:"
+	@echo "  frontend       - Generate templ components and build Tailwind CSS."
+	@echo "  templ-gen      - Generate templ components only."
+	@echo "  tailwind-build - Build Tailwind CSS once."
 	@echo "  tailwind-watch - Watch for CSS changes and rebuild automatically."
 	@echo ""
 	@echo "Testing:"
@@ -64,22 +70,24 @@ logs:
 	@$(COMPOSE_CMD) logs -f
 
 # Application Lifecycle
-.PHONY: build run watch clean
-build: docs tailwind-install
-	@echo "==> Generating templ components..."
-	@templ generate ./web
-	@echo "==> Building Tailwind CSS..."
-	@./tailwindcss -i ./web/styles/input.css -o ./web/assets/css/output.css
-	@echo "==> Building application binary..."
+.PHONY: build build-server build-worker run run-worker watch clean
+build: frontend build-server build-worker
+build-server: frontend
+	@echo "==> Building server binary..."
 	@go build -o ./bin/hermit ./cmd/api
-run: build
+build-worker: frontend
+	@echo "==> Building worker binary..."
+	@go build -o ./bin/worker ./cmd/worker
+run: build-server
 	@./bin/hermit
+run-worker: build-worker
+	@./bin/worker
 watch:
 	@echo "==> Starting live-reload server with Air..."
 	@air
 clean:
 	@echo "==> Cleaning up..."
-	@rm -rf ./bin ./docs ./tailwindcss
+	@rm -rf ./bin ./docs ./tailwindcss ./web/assets/css/output.css ./web/*_templ.go
 
 # Database & Docs
 .PHONY: migrate-up migrate-down docs
@@ -91,13 +99,20 @@ migrate-down:
 	@go run cmd/migrate/main.go down $(N)
 docs:
 	@echo "==> Generating API documentation..."
-	@swag init --generalInfo ./cmd/api/main.go --output ./docs
+	@swag init --generalInfo ./cmd/api/main.go --output ./docs || echo "Warning: swagger docs generation failed (non-critical)"
 
 # Frontend
-.PHONY: tailwind-install tailwind-watch
+.PHONY: frontend templ-gen tailwind-install tailwind-build tailwind-watch
+frontend: templ-gen tailwind-build
+templ-gen:
+	@echo "==> Generating templ components..."
+	@templ generate ./web
 tailwind-install:
 	@if [ ! -f tailwindcss ]; then curl -sL https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-macos-x64 -o tailwindcss; fi
 	@chmod +x tailwindcss
+tailwind-build: tailwind-install
+	@echo "==> Building Tailwind CSS..."
+	@./tailwindcss -i ./web/styles/input.css -o ./web/assets/css/output.css
 tailwind-watch: tailwind-install
 	@./tailwindcss -i ./web/styles/input.css -o ./web/assets/css/output.css --watch
 

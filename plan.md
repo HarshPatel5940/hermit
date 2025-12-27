@@ -6,29 +6,7 @@ None - all core business features implemented.
 
 ## Frontend Plan
 
-- [ ] **Chat Interface:**
-    - [ ] Basic web page with chat UI
-    - [ ] HTMX or JavaScript to call Q&A API
-    - [ ] Display AI responses with streaming support
-    - [ ] Show source citations
-
-- [ ] **Website Management:**
-    - [ ] List all websites with status
-    - [ ] Add new website form
-    - [ ] View crawl progress and statistics
-    - [ ] Trigger re-crawl
-    - [ ] Delete websites
-
-- [ ] **User Dashboard:**
-    - [ ] Login/registration pages
-    - [ ] API key management UI
-    - [ ] User profile and settings
-    - [ ] Website quota display
-
-- [ ] **Job Monitoring:**
-    - [ ] Real-time job queue status
-    - [ ] View active/pending/failed jobs
-    - [ ] Manual job retry/cancel
+None - all core frontend features implemented.
 
 ## Completed Backend Features
 
@@ -182,9 +160,91 @@ None - all core business features implemented.
     - Route versioning
     - Schema/model definitions
 
+### Frontend (Priority 1)
+
+- [x] **Modern UI Design**
+    - Dark theme with Tailwind CSS
+    - Responsive layout with collapsible sidebar
+    - Alpine.js for reactive components
+    - HTMX for dynamic updates without heavy JavaScript
+    - Clean, minimal interface
+
+- [x] **Authentication Pages**
+    - Login page with email/password
+    - Registration page with validation
+    - Error message display
+    - Responsive forms
+    - Gradient background design
+
+- [x] **Chat Interface**
+    - Real-time chat UI with message bubbles
+    - SSE streaming support for AI responses
+    - Auto-scrolling message container
+    - User/assistant message differentiation
+    - Loading states and error handling
+    - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
+
+- [x] **Website Management**
+    - Grid view of all websites
+    - Status badges (Indexed, Processing, Failed, Pending)
+    - Real-time progress indicators
+    - Add website modal with form
+    - Configurable crawl depth and max pages
+    - Reindex and delete actions
+    - Empty state with call-to-action
+    - Error message display per website
+
+- [x] **API Key Management**
+    - List all API keys with metadata
+    - Create new API key modal
+    - Scope selection (read/write)
+    - Key preview with masked characters
+    - One-time key display after creation
+    - Copy to clipboard functionality
+    - Revoke and delete actions
+    - Active/inactive status badges
+    - Security warnings for key handling
+
+- [x] **Job Monitoring**
+    - Job queue statistics dashboard
+    - Status filters (pending, processing, completed, failed)
+    - Job type filters (crawl, process, embed, cleanup)
+    - Real-time job cards with metadata
+    - Progress bars for active jobs
+    - Retry and cancel actions
+    - Job payload and error display
+    - Icon-based job type indicators
+    - Empty state handling
+
+- [x] **App Layout**
+    - Persistent sidebar navigation
+    - Collapsible sidebar with toggle
+    - Active page highlighting
+    - User menu with logout
+    - Responsive header with page title
+    - Icon-based navigation
+    - Smooth transitions and animations
+
+- [x] **Build System**
+    - Templ component generation
+    - Tailwind CSS compilation
+    - Makefile targets for frontend
+    - Clean task for generated files
+    - Integrated build pipeline
+    - Watch mode for development
+
 ## API Endpoints (v1)
 
-### Public
+### Web Routes
+- GET / - Redirect to login
+- GET /login - Login page
+- GET /register - Registration page
+- GET /chat - Chat interface (protected)
+- GET /websites - Website management (protected)
+- GET /api-keys - API key management (protected)
+- GET /jobs - Job monitoring (protected, admin)
+
+### Public API
 - POST /api/v1/auth/register - User registration
 - POST /api/v1/auth/login - User login
 - GET /api/v1/health - Health check
@@ -225,6 +285,14 @@ None - all core business features implemented.
 - PostgreSQL with pgx/sqlx
 - Redis for job queue
 - Asynq for background jobs
+
+### Frontend
+- Templ for type-safe HTML templates
+- Tailwind CSS v4 for styling
+- HTMX for dynamic interactions
+- Alpine.js for reactive components
+- Server-side rendering
+- SSE for real-time streaming
 
 ### Storage & AI
 - Garage (S3-compatible object storage)
@@ -349,29 +417,54 @@ ollama pull llama3.1
 
 ### Development
 ```bash
+# First time setup
+make setup
+
+# Start development with live-reload
+make dev
+
+# Or manually:
 # Start all services
-docker-compose up -d
+make up
 
 # Run migrations
 make migrate-up
 
-# Run API server
-go run cmd/api/main.go
+# Run API server with live-reload
+make watch
 
 # Run worker (separate terminal)
-go run cmd/worker/main.go
+make run-worker
+
+# Watch Tailwind CSS changes (optional, separate terminal)
+make tailwind-watch
 ```
 
 ### Production
 ```bash
-# Build binaries
+# Build all binaries and frontend
 make build
 
 # Run server
-./bin/server
+./bin/hermit
 
-# Run worker
+# Run worker (separate terminal)
 ./bin/worker
+```
+
+### Frontend Development
+```bash
+# Generate templ components
+make templ-gen
+
+# Build Tailwind CSS
+make tailwind-build
+
+# Build frontend (templ + CSS)
+make frontend
+
+# Watch CSS changes
+make tailwind-watch
 ```
 
 ## Future Enhancements (Optional)
