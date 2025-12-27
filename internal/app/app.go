@@ -10,6 +10,7 @@ import (
 	"hermit/api/controllers"
 	"hermit/api/middlewares"
 	"hermit/api/routes"
+	"hermit/internal/auth"
 	"hermit/internal/config"
 	"hermit/internal/contentprocessor"
 	"hermit/internal/crawler"
@@ -83,6 +84,10 @@ func NewFxApp() *fx.App {
 
 			repositories.NewWebsiteRepository,
 			repositories.NewPageRepository,
+			repositories.NewUserRepository,
+			repositories.NewAPIKeyRepository,
+
+			auth.NewService,
 
 			func(cfg *config.Config, logger *zap.Logger) *vectorizer.Embedder {
 				return vectorizer.NewEmbedder(cfg.OllamaURL, cfg.OllamaModel, logger)
@@ -117,6 +122,7 @@ func NewFxApp() *fx.App {
 			func(logger *zap.Logger, cfg *config.Config) (*controllers.JobsController, error) {
 				return controllers.NewJobsController(logger, cfg.RedisURL)
 			},
+			controllers.NewAuthController,
 
 			func() *echo.Echo {
 				return echo.New()
@@ -133,8 +139,8 @@ func NewFxApp() *fx.App {
 			middlewares.SetupMiddlewares(e, logger, cfg)
 		}),
 		fx.Invoke(RegisterHooks),
-		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController, hc *controllers.HealthController, jc *controllers.JobsController) {
-			routes.SetupRoutes(e, app, wc, hc, jc)
+		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController, hc *controllers.HealthController, jc *controllers.JobsController, ac *controllers.AuthController, authService *auth.Service) {
+			routes.SetupRoutes(e, app, wc, hc, jc, ac, authService)
 		}),
 		fx.Invoke(func(lc fx.Lifecycle, jobClient *jobs.Client) {
 			lc.Append(fx.Hook{

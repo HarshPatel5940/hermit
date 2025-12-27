@@ -24,7 +24,7 @@ func (r *WebsiteRepository) Create(ctx context.Context, url string) (*schema.Web
 	query := `
 		INSERT INTO websites (url, is_monitored, crawl_status)
 		VALUES ($1, $2, $3)
-		RETURNING id, url, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
+		RETURNING id, url, user_id, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
 		          total_pages_crawled, total_pages_failed, last_error, created_at, updated_at
 	`
 
@@ -41,7 +41,7 @@ func (r *WebsiteRepository) Create(ctx context.Context, url string) (*schema.Web
 func (r *WebsiteRepository) List(ctx context.Context) ([]schema.Website, error) {
 	var websites []schema.Website
 	query := `
-		SELECT id, url, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
+		SELECT id, url, user_id, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
 		       total_pages_crawled, total_pages_failed, last_error, created_at, updated_at
 		FROM websites
 	`
@@ -58,7 +58,7 @@ func (r *WebsiteRepository) List(ctx context.Context) ([]schema.Website, error) 
 func (r *WebsiteRepository) GetByID(ctx context.Context, id uint) (*schema.Website, error) {
 	var website schema.Website
 	query := `
-		SELECT id, url, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
+		SELECT id, url, user_id, is_monitored, crawl_status, crawl_started_at, crawl_completed_at,
 		       total_pages_crawled, total_pages_failed, last_error, created_at, updated_at
 		FROM websites
 		WHERE id = $1
@@ -73,6 +73,32 @@ func (r *WebsiteRepository) GetByID(ctx context.Context, id uint) (*schema.Websi
 	}
 
 	return &website, nil
+}
+
+// Update updates a website in the database.
+func (r *WebsiteRepository) Update(ctx context.Context, website *schema.Website) error {
+	query := `
+		UPDATE websites
+		SET url = $1, user_id = $2, is_monitored = $3, crawl_status = $4,
+		    crawl_started_at = $5, crawl_completed_at = $6,
+		    total_pages_crawled = $7, total_pages_failed = $8,
+		    last_error = $9, updated_at = NOW()
+		WHERE id = $10
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		website.URL,
+		website.UserID,
+		website.IsMonitored,
+		website.CrawlStatus,
+		website.CrawlStartedAt,
+		website.CrawlCompletedAt,
+		website.TotalPagesCrawled,
+		website.TotalPagesFailed,
+		website.LastError,
+		website.ID,
+	)
+	return err
 }
 
 // UpdateCrawlStatus updates the crawl status of a website.

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"hermit/api/middlewares"
 	"hermit/internal/jobs"
 	"hermit/internal/llm"
 	"hermit/internal/repositories"
@@ -18,6 +19,7 @@ import (
 type WebsiteController struct {
 	websiteRepo *repositories.WebsiteRepository
 	pageRepo    *repositories.PageRepository
+	userRepo    *repositories.UserRepository
 	jobClient   *jobs.Client
 	ragService  *llm.RAGService
 	logger      *zap.Logger
@@ -27,6 +29,7 @@ type WebsiteController struct {
 func NewWebsiteController(
 	websiteRepo *repositories.WebsiteRepository,
 	pageRepo *repositories.PageRepository,
+	userRepo *repositories.UserRepository,
 	jobClient *jobs.Client,
 	ragService *llm.RAGService,
 	logger *zap.Logger,
@@ -34,6 +37,7 @@ func NewWebsiteController(
 	return &WebsiteController{
 		websiteRepo: websiteRepo,
 		pageRepo:    pageRepo,
+		userRepo:    userRepo,
 		jobClient:   jobClient,
 		ragService:  ragService,
 		logger:      logger,
@@ -57,14 +61,43 @@ type WebsiteCreateRequest struct {
 // @Failure      500      {object}  map[string]string
 // @Router       /websites [post]
 func (wc *WebsiteController) CreateWebsite(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	var req WebsiteCreateRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
 	}
 
+	// Check if user can create more websites
+	websiteCount, err := wc.userRepo.GetWebsiteCount(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check website limit"})
+	}
+
+	user, err := wc.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get user"})
+	}
+
+	if !user.CanCreateWebsite(websiteCount) {
+		return c.JSON(http.StatusForbidden, map[string]string{
+			"error": fmt.Sprintf("Website limit reached (%d/%d)", websiteCount, user.WebsiteLimit),
+		})
+	}
+
 	website, err := wc.websiteRepo.Create(c.Request().Context(), req.URL)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create website"})
+	}
+
+	// Associate website with user
+	website.UserID = &userID
+	err = wc.websiteRepo.Update(c.Request().Context(), website)
+	if err != nil {
+		wc.logger.Error("Failed to associate website with user", zap.Error(err))
 	}
 
 	// Enqueue crawl job
@@ -88,6 +121,11 @@ func (wc *WebsiteController) CreateWebsite(c echo.Context) error {
 // @Failure      500    {object}  map[string]string
 // @Router       /websites [get]
 func (wc *WebsiteController) ListWebsites(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	// Parse pagination params
 	page := 1
 	if pageParam := c.QueryParam("page"); pageParam != "" {
@@ -103,9 +141,19 @@ func (wc *WebsiteController) ListWebsites(c echo.Context) error {
 		}
 	}
 
-	websites, err := wc.websiteRepo.List(c.Request().Context())
+	// Get all websites
+	allWebsites, err := wc.websiteRepo.List(c.Request().Context())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to list websites"})
+	}
+
+	// Filter by user ownership (admins can see all)
+	user := middlewares.GetUser(c)
+	var websites []schema.Website
+	for _, w := range allWebsites {
+		if user.IsAdmin() || (w.UserID != nil && *w.UserID == userID) {
+			websites = append(websites, w)
+		}
 	}
 
 	// Calculate pagination
@@ -165,10 +213,29 @@ type PaginatedResponse struct {
 // @Failure      500     {object}  map[string]string
 // @Router       /websites/{id}/pages [get]
 func (wc *WebsiteController) GetPages(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	idParam := c.Param("id")
 	websiteID, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid website ID"})
+	}
+
+	// Verify ownership
+	website, err := wc.websiteRepo.GetByID(c.Request().Context(), uint(websiteID))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve website"})
+	}
+	if website == nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Website not found"})
+	}
+
+	user := middlewares.GetUser(c)
+	if !user.IsAdmin() && (website.UserID == nil || *website.UserID != userID) {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Access denied"})
 	}
 
 	// Parse pagination params
@@ -258,10 +325,29 @@ type QueryRequest struct {
 // @Failure      500    {object}  map[string]string
 // @Router       /websites/{id}/query [post]
 func (wc *WebsiteController) QueryWebsite(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	idParam := c.Param("id")
 	websiteID, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid website ID"})
+	}
+
+	// Verify ownership
+	website, err := wc.websiteRepo.GetByID(c.Request().Context(), uint(websiteID))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve website"})
+	}
+	if website == nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Website not found"})
+	}
+
+	user := middlewares.GetUser(c)
+	if !user.IsAdmin() && (website.UserID == nil || *website.UserID != userID) {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Access denied"})
 	}
 
 	var req QueryRequest
@@ -294,10 +380,29 @@ func (wc *WebsiteController) QueryWebsite(c echo.Context) error {
 // @Failure      500    {object}  map[string]string
 // @Router       /websites/{id}/query/stream [post]
 func (wc *WebsiteController) QueryWebsiteStream(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	idParam := c.Param("id")
 	websiteID, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid website ID"})
+	}
+
+	// Verify ownership
+	website, err := wc.websiteRepo.GetByID(c.Request().Context(), uint(websiteID))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve website"})
+	}
+	if website == nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Website not found"})
+	}
+
+	user := middlewares.GetUser(c)
+	if !user.IsAdmin() && (website.UserID == nil || *website.UserID != userID) {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Access denied"})
 	}
 
 	var req QueryRequest
@@ -360,6 +465,11 @@ func (wc *WebsiteController) QueryWebsiteStream(c echo.Context) error {
 // @Failure      500  {object}  map[string]string
 // @Router       /websites/{id}/status [get]
 func (wc *WebsiteController) GetWebsiteStatus(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	idParam := c.Param("id")
 	websiteID, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
@@ -373,6 +483,11 @@ func (wc *WebsiteController) GetWebsiteStatus(c echo.Context) error {
 
 	if website == nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Website not found"})
+	}
+
+	user := middlewares.GetUser(c)
+	if !user.IsAdmin() && (website.UserID == nil || *website.UserID != userID) {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Access denied"})
 	}
 
 	return c.JSON(http.StatusOK, website)
@@ -391,6 +506,11 @@ func (wc *WebsiteController) GetWebsiteStatus(c echo.Context) error {
 // @Failure      500  {object}  map[string]string
 // @Router       /websites/{id}/recrawl [post]
 func (wc *WebsiteController) RecrawlWebsite(c echo.Context) error {
+	userID, err := middlewares.GetUserID(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+	}
+
 	idParam := c.Param("id")
 	websiteID, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
@@ -404,6 +524,11 @@ func (wc *WebsiteController) RecrawlWebsite(c echo.Context) error {
 
 	if website == nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Website not found"})
+	}
+
+	user := middlewares.GetUser(c)
+	if !user.IsAdmin() && (website.UserID == nil || *website.UserID != userID) {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Access denied"})
 	}
 
 	// Check if already crawling
