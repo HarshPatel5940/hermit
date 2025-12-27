@@ -77,6 +77,36 @@ func (l *OllamaLLM) GenerateWithContext(ctx context.Context, query string, conte
 	return l.GenerateResponse(ctx, prompt)
 }
 
+// GenerateWithContextStream generates a streaming response with context chunks from RAG.
+// The callback is called for each chunk of the response.
+func (l *OllamaLLM) GenerateWithContextStream(ctx context.Context, query string, contextChunks []string, callback func(chunk string) error) error {
+	if query == "" {
+		return fmt.Errorf("query cannot be empty")
+	}
+
+	// Build prompt with context
+	prompt := l.buildRAGPrompt(query, contextChunks)
+
+	req := &api.GenerateRequest{
+		Model:  l.model,
+		Prompt: prompt,
+		Stream: boolPtr(true), // Enable streaming
+	}
+
+	err := l.client.Generate(ctx, req, func(resp api.GenerateResponse) error {
+		if resp.Response != "" {
+			return callback(resp.Response)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("streaming LLM generation failed: %w", err)
+	}
+
+	return nil
+}
+
 // buildRAGPrompt constructs a prompt for RAG-based generation.
 func (l *OllamaLLM) buildRAGPrompt(query string, contextChunks []string) string {
 	var promptBuilder strings.Builder
@@ -156,4 +186,9 @@ func (l *OllamaLLM) GetModelInfo(ctx context.Context) (*api.ShowResponse, error)
 	}
 
 	return resp, nil
+}
+
+// boolPtr returns a pointer to a bool value.
+func boolPtr(b bool) *bool {
+	return &b
 }

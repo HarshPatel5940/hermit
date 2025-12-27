@@ -13,18 +13,21 @@ This project is built with a focus on a robust, production-grade architecture fr
 ### Key Features
 
 *   **Website Monitoring:** Add websites to a persistent monitoring list.
-*   **Intelligent Crawling:** A `colly`-based crawler navigates and scrapes all pages of a target domain.
-*   **Modern Data Pipeline:** Scraped content is stored in **MinIO**, with vector embeddings managed by **ChromaDB** for similarity search.
+*   **Intelligent Crawling:** A `colly`-based crawler navigates and scrapes all pages of a target domain with robots.txt respect and content quality filtering.
+*   **Modern Data Pipeline:** Scraped content is stored in **Garage** (S3-compatible), with vector embeddings managed by **ChromaDB** for similarity search.
 *   **Robust Backend:** A Go backend built with a clean, dependency-injected architecture using `uber-go/fx`.
+*   **Background Job Queue:** Asynchronous task processing using **asynq** and **Redis** for crawling and vectorization.
 *   **AI-Powered Chat:** RAG-based query system using Ollama for local LLM inference.
+*   **Content Processing:** Intelligent content extraction using readability algorithms to remove boilerplate and ads.
 
 ## Technology Stack
 
 *   **Backend:** Go
 *   **Framework:** Echo
 *   **Database:** PostgreSQL (managed with `sqlx`)
-*   **Object Storage:** MinIO
+*   **Object Storage:** Garage (S3-compatible)
 *   **Vector Store:** ChromaDB
+*   **Job Queue:** Redis + Asynq
 *   **LLM & Embeddings:** Ollama (local inference)
 *   **API Documentation:** Swagger (`echo-swagger`)
 *   **Live Reloading:** Air
@@ -53,9 +56,14 @@ This project is managed entirely through a comprehensive `Makefile`. Run `make h
     Copy the `.env.example` file to `.env`. The default values are configured to work with the `docker-compose.yml` file and do not need to be changed for local development.
 
 3.  **First-Time Setup:**
-    This command starts all backend services (Postgres, MinIO, ChromaDB, Ollama) and runs the database migrations.
+    This command starts all backend services (Postgres, Garage, ChromaDB, Redis, Ollama) and runs the database migrations.
     ```sh
     make setup
+    ```
+    
+    **Note:** If you pull the latest changes, run migrations to update your database schema:
+    ```sh
+    make migrate-up
     ```
 
 4.  **Pull Ollama Models:**
@@ -73,9 +81,20 @@ This project is managed entirely through a comprehensive `Makefile`. Run `make h
     make dev
     ```
 
-6.  **Access the API:**
+6.  **Run the Worker (Job Processor):**
+    In a separate terminal, start the worker to process background jobs (crawling, vectorization):
+    ```sh
+    ./hermit-worker
+    ```
+    Or build and run:
+    ```sh
+    go run ./cmd/worker
+    ```
+
+7.  **Access the API:**
     *   The API will be running at `http://localhost:8080`.
     *   API documentation (Swagger) is available at `http://localhost:8080/api/swagger/index.html`.
+    *   Health check: `http://localhost:8080/api/health`
 
 ### API Endpoints
 
@@ -90,14 +109,47 @@ This project is managed entirely through a comprehensive `Makefile`. Run `make h
 
 **AI Chat (RAG):**
 *   `POST /api/websites/{id}/query` - Ask questions about website content
+*   `POST /api/websites/{id}/query/stream` - Ask questions with streaming SSE response
+
+**Job Management:**
+*   `GET /api/jobs/queues` - List all job queues with statistics
+*   `GET /api/jobs/pending?queue=crawl&limit=50` - List pending jobs
+*   `GET /api/jobs/active?queue=crawl` - List running jobs
+*   `GET /api/jobs/scheduled?queue=crawl` - List scheduled jobs
+*   `GET /api/jobs/retry?queue=crawl` - List jobs pending retry
+*   `GET /api/jobs/archived?queue=crawl` - List failed jobs
+*   `POST /api/jobs/{id}/cancel?queue=crawl` - Cancel a job
+*   `POST /api/jobs/{id}/retry?queue=crawl` - Retry a failed job
+*   `POST /api/jobs/queues/{queue}/pause` - Pause a queue
+*   `POST /api/jobs/queues/{queue}/resume` - Resume a queue
+
+**Health & Monitoring:**
+*   `GET /api/health` - Check health of all services (Postgres, Garage, ChromaDB, Ollama)
 
 ### Other Useful Commands
 
 *   `make down`: Stop all running services.
 *   `make logs`: Tail the logs from all running services.
+*   `make migrate-up`: Run database migrations.
+*   `make migrate-down`: Rollback last database migration.
 *   `make test`: Run the test suite.
 *   `make docs`: Manually regenerate the API documentation.
 *   `make clean`: Clean up build artifacts and containers.
+
+### Database Migrations
+
+The project uses database migrations to manage schema changes. Migrations are located in `migrations/` directory.
+
+**Available migrations:**
+- `001_create_websites_table` - Creates websites table
+- `002_create_pages_table` - Creates pages table
+- `003_add_website_crawl_status` - Adds crawl status tracking
+- `004_add_normalized_url` - Adds normalized URL with unique constraint for duplicate prevention
+
+**Commands:**
+- `make migrate-up` - Apply all pending migrations
+- `make migrate-down` - Rollback the last migration
+- `make migrate-status` - Check migration status
 
 ### Configuration
 

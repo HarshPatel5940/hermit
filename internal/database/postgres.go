@@ -3,9 +3,10 @@ package database
 import (
 	"hermit/internal/config"
 	"log"
+	"time"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 // NewPostgresDB creates a new PostgreSQL database connection using sqlx.
@@ -16,6 +17,13 @@ func NewPostgresDB(cfg *config.Config) (*sqlx.DB, error) {
 		return nil, err
 	}
 
-	log.Println("Successfully connected to PostgreSQL database.")
+	// Configure connection pool
+	db.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	db.SetConnMaxLifetime(time.Duration(cfg.DBConnMaxLifetime) * time.Minute)
+
+	log.Printf("Successfully connected to PostgreSQL database (pool: max_open=%d, max_idle=%d, max_lifetime=%dm)",
+		cfg.DBMaxOpenConns, cfg.DBMaxIdleConns, cfg.DBConnMaxLifetime)
+
 	return db, nil
 }

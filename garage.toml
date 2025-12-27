@@ -1,0 +1,36 @@
+metadata_dir = "/meta"
+data_dir = "/data"
+
+db_engine = "lmdb"
+
+replication_mode = "none"
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "1799bccfd7411eddcf9ebd316bc1f5287ad12a68094e1c6ac6abde7e6feae1ec"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3902"
+root_domain = ".s3.garage.localhost"
+
+[s3_web]
+bind_addr = "[::]:3903"
+root_domain = ".web.garage.localhost"
+index = "index.html"
+
+[k2v_api]
+api_bind_addr = "[::]:3904"
+
+[admin]
+api_bind_addr = "[::]:3900"
+metrics_token = "admin-token-change-me"
+admin_token = "admin-token-change-me"
+
+# Increase request timeouts for large files
+[s3_api.timeouts]
+request_timeout = "300s"
+
+# Performance tuning
+[lmdb_map_size]
+metadata = "1GB"

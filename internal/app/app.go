@@ -11,8 +11,10 @@ import (
 	"hermit/api/middlewares"
 	"hermit/api/routes"
 	"hermit/internal/config"
+	"hermit/internal/contentprocessor"
 	"hermit/internal/crawler"
 	"hermit/internal/database"
+	"hermit/internal/jobs"
 	"hermit/internal/llm"
 	"hermit/internal/repositories"
 	"hermit/internal/storage"
@@ -74,10 +76,10 @@ func NewFxApp() *fx.App {
 			NewLogger,
 
 			database.NewPostgresDB,
-			database.NewMinIOClient,
+			database.NewGarageClient,
 			database.NewChromaDBClient,
 
-			storage.NewMinIOStorage,
+			storage.NewGarageStorage,
 
 			repositories.NewWebsiteRepository,
 			repositories.NewPageRepository,
@@ -97,9 +99,24 @@ func NewFxApp() *fx.App {
 				return llm.NewRAGService(vectorizerSvc, ollamaLLM, logger, cfg.RAGTopK, cfg.RAGContextChunks)
 			},
 
+			func(logger *zap.Logger) *contentprocessor.ContentProcessor {
+				return contentprocessor.NewContentProcessor(logger)
+			},
+			func(cfg *config.Config, logger *zap.Logger) *contentprocessor.RobotsEnforcer {
+				return contentprocessor.NewRobotsEnforcer(cfg.CrawlerUserAgent, logger)
+			},
+
 			crawler.NewCrawler,
 
+			func(cfg *config.Config, logger *zap.Logger) (*jobs.Client, error) {
+				return jobs.NewClient(cfg.RedisURL, logger)
+			},
+
 			controllers.NewWebsiteController,
+			controllers.NewHealthController,
+			func(logger *zap.Logger, cfg *config.Config) (*controllers.JobsController, error) {
+				return controllers.NewJobsController(logger, cfg.RedisURL)
+			},
 
 			func() *echo.Echo {
 				return echo.New()
@@ -114,8 +131,15 @@ func NewFxApp() *fx.App {
 		}),
 		fx.Invoke(middlewares.SetupMiddlewares),
 		fx.Invoke(RegisterHooks),
-		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController) {
-			routes.SetupRoutes(e, app, wc)
+		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController, hc *controllers.HealthController, jc *controllers.JobsController) {
+			routes.SetupRoutes(e, app, wc, hc, jc)
+		}),
+		fx.Invoke(func(lc fx.Lifecycle, jobClient *jobs.Client) {
+			lc.Append(fx.Hook{
+				OnStop: func(ctx context.Context) error {
+					return jobClient.Close()
+				},
+			})
 		}),
 	)
 }

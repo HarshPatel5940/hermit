@@ -12,17 +12,20 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  minio:
-    image: minio/minio
+  garage:
+    image: dxflrs/garage:v0.9.0
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "3900:3900" # Admin API
+      - "3901:3901" # K2V API
+      - "3902:3902" # S3 API
+      - "3903:3903" # Web endpoint
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+      RUST_LOG: garage=info
+    command: server
     volumes:
-      - minio_data:/data
+      - garage_data:/data
+      - garage_meta:/meta
+      - ./garage.toml:/etc/garage.toml
 
   chroma:
     image: ghcr.io/chroma-core/chroma:latest
@@ -30,6 +33,14 @@ services:
       - "8000:8000"
     volumes:
       - chroma_data:/chroma/chroma
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
   ollama:
     image: ollama/ollama:latest
@@ -48,6 +59,8 @@ services:
 
 volumes:
   postgres_data:
-  minio_data:
+  garage_data:
+  garage_meta:
   chroma_data:
+  redis_data:
   ollama_data:

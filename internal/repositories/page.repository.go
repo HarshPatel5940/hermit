@@ -19,11 +19,16 @@ func NewPageRepository(db *sqlx.DB) *PageRepository {
 	return &PageRepository{db: db}
 }
 
+// DB returns the underlying database connection.
+func (r *PageRepository) DB() *sqlx.DB {
+	return r.db
+}
+
 // Create adds a new page to the database.
 func (r *PageRepository) Create(ctx context.Context, websiteID uint, url string) (*schema.Page, error) {
 	query := `
-		INSERT INTO pages (website_id, url, status)
-		VALUES ($1, $2, $3)
+		INSERT INTO pages (website_id, url, normalized_url, status)
+		VALUES ($1, $2, $2, $3)
 		RETURNING id, website_id, url, minio_object_key, content_hash, status, error_message, crawled_at, created_at, updated_at
 	`
 
@@ -39,10 +44,10 @@ func (r *PageRepository) Create(ctx context.Context, websiteID uint, url string)
 // Upsert creates or updates a page record.
 func (r *PageRepository) Upsert(ctx context.Context, websiteID uint, url string) (*schema.Page, error) {
 	query := `
-		INSERT INTO pages (website_id, url, status)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (website_id, url)
-		DO UPDATE SET updated_at = NOW()
+		INSERT INTO pages (website_id, url, normalized_url, status)
+		VALUES ($1, $2, $2, $3)
+		ON CONFLICT (website_id, normalized_url)
+		DO UPDATE SET url = EXCLUDED.url, updated_at = NOW()
 		RETURNING id, website_id, url, minio_object_key, content_hash, status, error_message, crawled_at, created_at, updated_at
 	`
 
