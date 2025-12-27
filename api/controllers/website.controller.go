@@ -5,6 +5,7 @@ import (
 	"hermit/internal/jobs"
 	"hermit/internal/llm"
 	"hermit/internal/repositories"
+	"hermit/internal/schema"
 	_ "hermit/internal/schema" // Used by swaggo
 	"net/http"
 	"strconv"
@@ -78,30 +79,90 @@ func (wc *WebsiteController) CreateWebsite(c echo.Context) error {
 
 // ListWebsites godoc
 // @Summary      List all websites
-// @Description  Retrieves a list of all monitored websites.
+// @Description  Retrieves a list of all monitored websites with pagination.
 // @Tags         Websites
 // @Produce      json
-// @Success      200  {array}   schema.Website
-// @Failure      500  {object}  map[string]string
+// @Param        page   query     int     false  "Page number"     default(1)
+// @Param        limit  query     int     false  "Items per page"  default(20)
+// @Success      200    {object}  PaginatedResponse
+// @Failure      500    {object}  map[string]string
 // @Router       /websites [get]
 func (wc *WebsiteController) ListWebsites(c echo.Context) error {
+	// Parse pagination params
+	page := 1
+	if pageParam := c.QueryParam("page"); pageParam != "" {
+		if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	limit := 20
+	if limitParam := c.QueryParam("limit"); limitParam != "" {
+		if l, err := strconv.Atoi(limitParam); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
 	websites, err := wc.websiteRepo.List(c.Request().Context())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to list websites"})
 	}
 
-	return c.JSON(http.StatusOK, websites)
+	// Calculate pagination
+	total := len(websites)
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	// Get page slice
+	start := (page - 1) * limit
+	end := start + limit
+	if start >= total {
+		start = 0
+		end = 0
+	}
+	if end > total {
+		end = total
+	}
+
+	var pageData interface{}
+	if start < end {
+		pageData = websites[start:end]
+	} else {
+		pageData = []interface{}{}
+	}
+
+	return c.JSON(http.StatusOK, PaginatedResponse{
+		Data:       pageData,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	})
+}
+
+// PaginatedResponse represents a paginated response.
+type PaginatedResponse struct {
+	Data       interface{} `json:"data"`
+	Page       int         `json:"page"`
+	Limit      int         `json:"limit"`
+	Total      int         `json:"total"`
+	TotalPages int         `json:"total_pages"`
 }
 
 // GetPages godoc
 // @Summary      Get pages for a website
-// @Description  Retrieves all crawled pages for a specific website.
+// @Description  Retrieves all crawled pages for a specific website with pagination.
 // @Tags         Websites
 // @Produce      json
-// @Param        id   path      int  true  "Website ID"
-// @Success      200  {array}   schema.Page
-// @Failure      400  {object}  map[string]string
-// @Failure      500  {object}  map[string]string
+// @Param        id      path      int     true   "Website ID"
+// @Param        page    query     int     false  "Page number"     default(1)
+// @Param        limit   query     int     false  "Items per page"  default(50)
+// @Param        status  query     string  false  "Filter by status (success, error, pending)"
+// @Success      200     {object}  PaginatedResponse
+// @Failure      400     {object}  map[string]string
+// @Failure      500     {object}  map[string]string
 // @Router       /websites/{id}/pages [get]
 func (wc *WebsiteController) GetPages(c echo.Context) error {
 	idParam := c.Param("id")
@@ -110,12 +171,73 @@ func (wc *WebsiteController) GetPages(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid website ID"})
 	}
 
-	pages, err := wc.pageRepo.GetByWebsiteID(c.Request().Context(), uint(websiteID))
+	// Parse pagination params
+	page := 1
+	if pageParam := c.QueryParam("page"); pageParam != "" {
+		if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	limit := 50
+	if limitParam := c.QueryParam("limit"); limitParam != "" {
+		if l, err := strconv.Atoi(limitParam); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	status := c.QueryParam("status")
+
+	// Get all pages (for now - TODO: add DB-level pagination)
+	allPages, err := wc.pageRepo.GetByWebsiteID(c.Request().Context(), uint(websiteID))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve pages"})
 	}
 
-	return c.JSON(http.StatusOK, pages)
+	// Filter by status if provided
+	var filteredPages []schema.Page
+	if status != "" {
+		for _, p := range allPages {
+			if p.Status == status {
+				filteredPages = append(filteredPages, p)
+			}
+		}
+	} else {
+		filteredPages = allPages
+	}
+
+	// Calculate pagination
+	total := len(filteredPages)
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	// Get page slice
+	start := (page - 1) * limit
+	end := start + limit
+	if start >= total {
+		start = 0
+		end = 0
+	}
+	if end > total {
+		end = total
+	}
+
+	var pageData []schema.Page
+	if start < end {
+		pageData = filteredPages[start:end]
+	} else {
+		pageData = []schema.Page{}
+	}
+
+	return c.JSON(http.StatusOK, PaginatedResponse{
+		Data:       pageData,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	})
 }
 
 // QueryRequest defines the request body for querying a website.

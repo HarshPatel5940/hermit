@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"hermit/internal/config"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -8,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func SetupMiddlewares(e *echo.Echo, logger *zap.Logger) {
+func SetupMiddlewares(e *echo.Echo, logger *zap.Logger, cfg *config.Config) {
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogURI:    true,
 		LogStatus: true,
@@ -26,14 +27,35 @@ func SetupMiddlewares(e *echo.Echo, logger *zap.Logger) {
 	e.Use(middleware.Recover())
 	e.Use(middleware.RemoveTrailingSlash())
 	e.Use(middleware.Decompress())
-	e.Use(middleware.Secure())
-	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(20)))
 
-	// For development, a permissive CORS policy is fine.
-	// For production, this should be locked down to specific origins.
+	// Apply security headers
+	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+		XSSProtection:         "1; mode=block",
+		ContentTypeNosniff:    "nosniff",
+		XFrameOptions:         "DENY",
+		HSTSMaxAge:            31536000,
+		ContentSecurityPolicy: "default-src 'self'",
+	}))
+
+	// Apply custom rate limiter
+	rateLimiterCfg := RateLimiterConfig{
+		RequestsPerMinute: cfg.RateLimitRequestsPerMin,
+		Burst:             cfg.RateLimitBurst,
+		Enabled:           cfg.RateLimitEnabled,
+	}
+	e.Use(NewRateLimiter(rateLimiterCfg, logger))
+
+	// CORS configuration
+	corsOrigins := []string{"*"}
+	if cfg.Port == "8080" { // Production check - adjust as needed
+		corsOrigins = []string{"https://yourdomain.com"} // Configure via env in production
+	}
+
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete, http.MethodOptions},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowOrigins:     corsOrigins,
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete, http.MethodOptions},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowCredentials: true,
+		MaxAge:           3600,
 	}))
 }

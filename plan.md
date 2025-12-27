@@ -183,11 +183,20 @@ This phase covers authentication, security, monitoring, and scaling.
 - [ ] Add per-user website limits and quotas.
 
 ### Rate Limiting & Security
-- [ ] Add API rate limiting (per-user/per-IP).
-- [ ] Implement abuse detection and prevention.
-- [ ] Add input validation and sanitization.
-- [ ] Implement CSRF protection.
-- [ ] Add security headers middleware.
+- [x] Add API rate limiting (per-IP).
+    - [x] Implemented custom memory-based rate limiter.
+    - [x] Configurable requests per minute (default: 60).
+    - [x] Per-IP tracking with automatic cleanup.
+    - [x] 429 Too Many Requests response.
+- [x] Add security headers middleware.
+    - [x] XSS Protection header.
+    - [x] Content-Type nosniff.
+    - [x] X-Frame-Options DENY.
+    - [x] HSTS with 1-year max age.
+    - [x] Content Security Policy.
+- [ ] Implement abuse detection and prevention (future).
+- [ ] Add input validation and sanitization (future).
+- [ ] Implement CSRF protection (future).
 
 ### Observability & Monitoring
 - [ ] Add Prometheus metrics endpoint.
@@ -251,10 +260,14 @@ This phase covers authentication, security, monitoring, and scaling.
 - [ ] Add content categorization/tagging.
 
 ### API Enhancements
-- [ ] Add pagination to all list endpoints.
-- [ ] Implement filtering and sorting.
-- [ ] Add GraphQL API option.
-- [ ] Implement webhooks for crawl completion.
+- [x] Add pagination to all list endpoints.
+    - [x] GET /api/websites with page/limit params.
+    - [x] GET /api/websites/{id}/pages with page/limit/status params.
+    - [x] PaginatedResponse type with metadata.
+    - [x] Max limit of 100 items per page.
+- [ ] Implement filtering and sorting (partial - status filter done).
+- [ ] Add GraphQL API option (future).
+- [ ] Implement webhooks for crawl completion events (future).
 
 ---
 

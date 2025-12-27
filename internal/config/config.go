@@ -46,6 +46,10 @@ type Config struct {
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
 	DBConnMaxLifetime int // in minutes
+	// Rate limiting
+	RateLimitEnabled        bool
+	RateLimitRequestsPerMin int64
+	RateLimitBurst          int64
 }
 
 // NewConfig creates a new Config struct
@@ -94,6 +98,10 @@ func NewConfig() *Config {
 		DBMaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		DBConnMaxLifetime: getEnvInt("DB_CONN_MAX_LIFETIME", 5), // 5 minutes default
+		// Rate limiting
+		RateLimitEnabled:        getEnvBool("RATE_LIMIT_ENABLED", true),
+		RateLimitRequestsPerMin: int64(getEnvInt("RATE_LIMIT_REQUESTS_PER_MIN", 60)),
+		RateLimitBurst:          int64(getEnvInt("RATE_LIMIT_BURST", 10)),
 	}
 }
 

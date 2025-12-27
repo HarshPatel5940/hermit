@@ -129,7 +129,9 @@ func NewFxApp() *fx.App {
 		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: log}
 		}),
-		fx.Invoke(middlewares.SetupMiddlewares),
+		fx.Invoke(func(e *echo.Echo, logger *zap.Logger, cfg *config.Config) {
+			middlewares.SetupMiddlewares(e, logger, cfg)
+		}),
 		fx.Invoke(RegisterHooks),
 		fx.Invoke(func(e *echo.Echo, app *App, wc *controllers.WebsiteController, hc *controllers.HealthController, jc *controllers.JobsController) {
 			routes.SetupRoutes(e, app, wc, hc, jc)
